@@ -49,7 +49,6 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen> with SingleTick
         throw Exception('Provider ID not found in user metadata');
       }
 
-      // Fetch all bookings for the provider
       final fetchedBookings = await BookingService.getProviderBookings(providerId);
       setState(() {
         _allBookings = fetchedBookings;
@@ -80,10 +79,17 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen> with SingleTick
         BookingStatus.cancelled
       ].contains(b.status)).toList();
 
-  Future<void> _assignDriver(String bookingId, String driverId) async {
+  Future<void> _assignDriver(String bookingId, String driverId, String ambulanceId) async {
     try {
-      await BookingService.assignAmbulance(bookingId, driverId, driverId: driverId);
+
+      await BookingService.assignAmbulance(bookingId, ambulanceId, driverId: driverId);
       await _fetchBookings(); 
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Driver berhasil ditugaskan')),
+        );
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -322,7 +328,6 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen> with SingleTick
       );
     }
 
-    // Active Mission Action
     return Column(
       children: [
         Row(
@@ -455,8 +460,13 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen> with SingleTick
       ),
     );
 
-    if (result != null && result is String) {
-      _assignDriver(booking.id, result);
+    if (result != null && result is Map<String, dynamic>) {
+      final driverId = result['driverId']?.toString();
+      final ambulanceId = result['ambulanceId']?.toString();
+
+      if (driverId != null && ambulanceId != null) {
+        _assignDriver(booking.id, driverId, ambulanceId);
+      }
     }
   }
 
