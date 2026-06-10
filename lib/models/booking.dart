@@ -1,70 +1,104 @@
-enum BookingStatus { pending, assigned, inProgress, completed, cancelled }
+enum BookingStatus {
+  draft,
+  confirmed,
+  en_route,
+  arrived,
+  to_hospital,
+  completed,
+  cancelled
+}
+
+extension BookingStatusExtension on BookingStatus {
+  String get name => toString().split('.').last;
+}
+
+BookingStatus parseBookingStatus(String status) {
+  return BookingStatus.values.firstWhere(
+    (e) => e.name == status,
+    orElse: () => BookingStatus.draft,
+  );
+}
 
 class Booking {
   final String id;
-  final String patientName;
-  final String pickupLocation;
-  final String destination;
-  final DateTime timestamp;
+  final String? ambulanceId;
+  final String? providerId;
+  final String? driverId;
+  final String bookingType;
+  final String patientCondition;
+  final String pickupAddress;
+  final double pickupLat;
+  final double pickupLng;
+  final String pickupH3;
+  final String destinationAddress;
+  final double destinationLat;
+  final double destinationLng;
+  final String userId;
   final BookingStatus status;
-  final String? assignedDriverId;
-  final String ambulanceType;
+  final DateTime createdAt;
 
   Booking({
     required this.id,
-    required this.patientName,
-    required this.pickupLocation,
-    required this.destination,
-    required this.timestamp,
+    this.ambulanceId,
+    this.providerId,
+    this.driverId,
+    required this.bookingType,
+    required this.patientCondition,
+    required this.pickupAddress,
+    required this.pickupLat,
+    required this.pickupLng,
+    required this.pickupH3,
+    required this.destinationAddress,
+    required this.destinationLat,
+    required this.destinationLng,
+    required this.userId,
     required this.status,
-    this.assignedDriverId,
-    required this.ambulanceType,
+    required this.createdAt,
   });
 
+  factory Booking.fromJson(Map<String, dynamic> json) {
+    return Booking(
+      id: json['id'],
+      ambulanceId: json['ambulance_id'],
+      providerId: json['provider_id'],
+      driverId: json['driver_id'],
+      bookingType: json['booking_type'],
+      patientCondition: json['patient_condition'],
+      pickupAddress: json['pickup_address'],
+      pickupLat: (json['pickup_lat'] as num).toDouble(),
+      pickupLng: (json['pickup_lng'] as num).toDouble(),
+      pickupH3: json['pickup_h3'],
+      destinationAddress: json['destination_address'],
+      destinationLat: (json['destination_lat'] as num).toDouble(),
+      destinationLng: (json['destination_lng'] as num).toDouble(),
+      userId: json['user_id'],
+      status: parseBookingStatus(json['status']),
+      createdAt: DateTime.parse(json['created_at']),
+    );
+  }
+
   Booking copyWith({
-    String? assignedDriverId,
+    String? ambulanceId,
+    String? driverId,
     BookingStatus? status,
   }) {
     return Booking(
       id: id,
-      patientName: patientName,
-      pickupLocation: pickupLocation,
-      destination: destination,
-      timestamp: timestamp,
+      ambulanceId: ambulanceId ?? this.ambulanceId,
+      providerId: providerId,
+      driverId: driverId ?? this.driverId,
+      bookingType: bookingType,
+      patientCondition: patientCondition,
+      pickupAddress: pickupAddress,
+      pickupLat: pickupLat,
+      pickupLng: pickupLng,
+      pickupH3: pickupH3,
+      destinationAddress: destinationAddress,
+      destinationLat: destinationLat,
+      destinationLng: destinationLng,
+      userId: userId,
       status: status ?? this.status,
-      assignedDriverId: assignedDriverId ?? this.assignedDriverId,
-      ambulanceType: ambulanceType,
+      createdAt: createdAt,
     );
   }
 }
-
-final List<Booking> dummyBookings = [
-  Booking(
-    id: 'BK001',
-    patientName: 'Budi Santoso',
-    pickupLocation: 'Jl. Merdeka No. 10, Jakarta',
-    destination: 'RS Pusat Nasional Dr. Cipto Mangunkusumo',
-    timestamp: DateTime.now().subtract(const Duration(minutes: 15)),
-    status: BookingStatus.pending,
-    ambulanceType: 'Ambulance Medis',
-  ),
-  Booking(
-    id: 'BK002',
-    patientName: 'Siti Aminah',
-    pickupLocation: 'Jl. Thamrin No. 5, Jakarta',
-    destination: 'RS Fatmawati',
-    timestamp: DateTime.now().subtract(const Duration(hours: 1)),
-    status: BookingStatus.assigned,
-    assignedDriverId: 'DRV001',
-    ambulanceType: 'Ambulance Sosial',
-  ),
-  Booking(
-    id: 'BK003',
-    patientName: 'Sara Latifa',
-    pickupLocation: 'Jl. Gatot Subroto No. 20, Jakarta',
-    destination: 'RS Siloam Semanggi',
-    timestamp: DateTime.now().subtract(const Duration(minutes: 5)),
-    status: BookingStatus.pending,
-    ambulanceType: 'Ambulance Jenazah',
-  ),
-];

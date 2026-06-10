@@ -57,8 +57,8 @@ class _AssignDriverScreenState extends State<AssignDriverScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(widget.booking.patientName, style: T.title),
-                          Text(widget.booking.ambulanceType, style: T.captionSmall.copyWith(color: C.red, fontWeight: FontWeight.bold)),
+                          Text(widget.booking.patientCondition, style: T.title),
+                          Text(widget.booking.bookingType.toUpperCase(), style: T.captionSmall.copyWith(color: C.red, fontWeight: FontWeight.bold)),
                         ],
                       ),
                     ),
@@ -76,7 +76,7 @@ class _AssignDriverScreenState extends State<AssignDriverScreen> {
               itemBuilder: (context, index) {
                 final driver = availableDrivers[index];
                 final isSelected = selectedDriverId == driver.id;
-                final isCurrentDriver = widget.booking.assignedDriverId == driver.id;
+                final isCurrentDriver = widget.booking.driverId == driver.id;
 
                 return InkWell(
                   onTap: () {

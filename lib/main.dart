@@ -1,8 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'themes/app_theme.dart';
-import 'screens/provider_home_screen.dart';
+import 'splash_screen.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  await dotenv.load(fileName: "assets/.env");
+
+  await Supabase.initialize(
+    url: dotenv.env['SUPABASE_URL']!,
+    anonKey: dotenv.env['SUPABASE_PUBLISHABLE_KEY']!,
+  );
+
   runApp(const ResQLinkProviderApp());
 }
 
@@ -15,7 +26,7 @@ class ResQLinkProviderApp extends StatelessWidget {
       title: 'ResQLink Provider',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.theme,
-      home: const ProviderHomeScreen(),
+      home: SplashScreen(),
     );
   }
 }
