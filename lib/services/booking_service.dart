@@ -13,12 +13,16 @@ class BookingService {
     return url;
   }
 
-  static Future<List<Booking>> getProviderBookings(String providerId) async {
+  static Future<List<Booking>> getProviderBookings(String providerId, {String? status}) async {
     final token = AuthService.accessToken;
     if (token == null) throw Exception('Not authenticated');
 
+    final uri = Uri.parse('$_baseUrl/providers/$providerId/bookings').replace(
+      queryParameters: status != null ? {'status': status} : null,
+    );
+
     final response = await http.get(
-      Uri.parse('$_baseUrl/providers/$providerId/bookings'),
+      uri,
       headers: {
         'Authorization': 'Bearer $token',
       },

@@ -17,8 +17,12 @@ class _AssignDriverScreenState extends State<AssignDriverScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Filter drivers by matching ambulance type or just show all
-    final availableDrivers = dummyDrivers;
+    // Filter drivers by matching ambulance type (case insensitive matching)
+    final availableDrivers = dummyDrivers.where((driver) {
+      final type = driver.ambulanceType.toLowerCase();
+      final target = widget.booking.bookingType.toLowerCase();
+      return type.contains(target);
+    }).toList();
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
@@ -69,11 +73,26 @@ class _AssignDriverScreenState extends State<AssignDriverScreen> {
           ),
           const SizedBox(height: 12),
           Expanded(
-            child: ListView.separated(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-              itemCount: availableDrivers.length,
-              separatorBuilder: (context, index) => const SizedBox(height: 12),
-              itemBuilder: (context, index) {
+            child: availableDrivers.isEmpty
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.person_off_outlined, size: 64, color: C.textGrey.withOpacity(0.3)),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Tidak ada driver tersedia untuk jenis\n${widget.booking.bookingType.toUpperCase()}',
+                          textAlign: TextAlign.center,
+                          style: T.body.copyWith(color: C.textGrey),
+                        ),
+                      ],
+                    ),
+                  )
+                : ListView.separated(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                    itemCount: availableDrivers.length,
+                    separatorBuilder: (context, index) => const SizedBox(height: 12),
+                    itemBuilder: (context, index) {
                 final driver = availableDrivers[index];
                 final isSelected = selectedDriverId == driver.id;
                 final isCurrentDriver = widget.booking.driverId == driver.id;

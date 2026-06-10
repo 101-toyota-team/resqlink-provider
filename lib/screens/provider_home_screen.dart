@@ -16,15 +16,23 @@ class ProviderHomeScreen extends StatefulWidget {
   State<ProviderHomeScreen> createState() => _ProviderHomeScreenState();
 }
 
-class _ProviderHomeScreenState extends State<ProviderHomeScreen> {
-  List<Booking> bookings = [];
+class _ProviderHomeScreenState extends State<ProviderHomeScreen> with SingleTickerProviderStateMixin {
+  List<Booking> _allBookings = [];
   bool _isLoading = true;
   String? _error;
+  late TabController _tabController;
 
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 3, vsync: this);
     _fetchBookings();
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
   }
 
   Future<void> _fetchBookings() async {
@@ -41,9 +49,10 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen> {
         throw Exception('Provider ID not found in user metadata');
       }
 
+      // Fetch all bookings for the provider
       final fetchedBookings = await BookingService.getProviderBookings(providerId);
       setState(() {
-        bookings = fetchedBookings;
+        _allBookings = fetchedBookings;
         _isLoading = false;
       });
     } catch (e) {
@@ -54,12 +63,27 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen> {
     }
   }
 
+  List<Booking> get _draftBookings => 
+      _allBookings.where((b) => b.status == BookingStatus.draft).toList();
+  
+  List<Booking> get _activeBookings => 
+      _allBookings.where((b) => [
+        BookingStatus.confirmed, 
+        BookingStatus.en_route, 
+        BookingStatus.arrived, 
+        BookingStatus.to_hospital
+      ].contains(b.status)).toList();
+  
+  List<Booking> get _historyBookings => 
+      _allBookings.where((b) => [
+        BookingStatus.completed, 
+        BookingStatus.cancelled
+      ].contains(b.status)).toList();
+
   Future<void> _assignDriver(String bookingId, String driverId) async {
-    // In real app, driverId might be ambulanceId or we get ambulanceId from driver
-    // For now, let's just use the driverId as ambulanceId for demonstration
     try {
       await BookingService.assignAmbulance(bookingId, driverId, driverId: driverId);
-      await _fetchBookings(); // Refresh list
+      await _fetchBookings(); 
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -72,7 +96,7 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen> {
   Future<void> _updateStatus(String bookingId, BookingStatus status) async {
     try {
       await BookingService.updateBookingStatus(bookingId, status.name);
-      await _fetchBookings(); // Refresh list
+      await _fetchBookings();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -88,7 +112,13 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen> {
       backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: Colors.white,
-        title: Text('ResQLink Dashboard', style: T.h3.copyWith(color: C.bg)),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Dashboard Provider', style: T.h3.copyWith(color: C.bg)),
+            Text('ResQLink Partner', style: T.captionSmall.copyWith(color: C.textGrey)),
+          ],
+        ),
         centerTitle: false,
         elevation: 0,
         actions: [
@@ -109,126 +139,87 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen> {
           ),
           const SizedBox(width: 8),
         ],
+        bottom: TabBar(
+          controller: _tabController,
+          labelColor: C.red,
+          unselectedLabelColor: C.textGrey,
+          indicatorColor: C.red,
+          indicatorWeight: 3,
+          labelStyle: T.label.copyWith(fontWeight: FontWeight.bold),
+          tabs: const [
+            Tab(text: 'Permintaan'),
+            Tab(text: 'Aktif'),
+            Tab(text: 'Riwayat'),
+          ],
+        ),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
-              ? Center(child: Text(_error!))
-              : Column(
+              ? _buildErrorState()
+              : TabBarView(
+                  controller: _tabController,
                   children: [
-                    _buildSummarySection(),
-                    Expanded(
-                      child: Container(
-                        width: double.infinity,
-                        decoration: const BoxDecoration(
-                          color: Color(0xFFF8F9FA),
-                          borderRadius: BorderRadius.only(
-                            topLeft: Radius.circular(24),
-                            topRight: Radius.circular(24),
-                          ),
-                        ),
-                        child: RefreshIndicator(
-                          onRefresh: _fetchBookings,
-                          child: SingleChildScrollView(
-                            physics: const AlwaysScrollableScrollPhysics(),
-                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text('Booking Aktif', style: T.h3),
-                                    TextButton(
-                                      onPressed: _fetchBookings,
-                                      child: Text('Refresh', style: T.btnSm.copyWith(color: C.red)),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 12),
-                                bookings.isEmpty
-                                    ? const Center(child: Padding(
-                                        padding: EdgeInsets.only(top: 40),
-                                        child: Text('Tidak ada booking aktif'),
-                                      ))
-                                    : ListView.separated(
-                                        shrinkWrap: true,
-                                        physics: const NeverScrollableScrollPhysics(),
-                                        itemCount: bookings.length,
-                                        separatorBuilder: (context, index) => const SizedBox(height: 16),
-                                        itemBuilder: (context, index) {
-                                          final booking = bookings[index];
-                                          return _buildModernBookingCard(booking);
-                                        },
-                                      ),
-                                const SizedBox(height: 24),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
+                    _buildBookingList(_draftBookings, 'Tidak ada permintaan baru'),
+                    _buildBookingList(_activeBookings, 'Tidak ada misi aktif'),
+                    _buildBookingList(_historyBookings, 'Belum ada riwayat pesanan'),
                   ],
                 ),
     );
   }
 
-  Widget _buildSummarySection() {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(20, 10, 20, 24),
-      color: Colors.white,
-      child: Row(
-        children: [
-          _buildSummaryCard(
-            'Menunggu',
-            bookings.where((b) => b.status == BookingStatus.draft).length.toString(),
-            C.amber,
-            Icons.timer_outlined,
-          ),
-          const SizedBox(width: 12),
-          _buildSummaryCard(
-            'Ditugaskan',
-            bookings.where((b) => b.status == BookingStatus.confirmed).length.toString(),
-            Colors.blue,
-            Icons.local_shipping_outlined,
-          ),
-          const SizedBox(width: 12),
-          _buildSummaryCard(
-            'Berjalan',
-            bookings.where((b) => b.status == BookingStatus.en_route || b.status == BookingStatus.to_hospital).length.toString(),
-            Colors.green,
-            Icons.people_outline,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSummaryCard(String label, String value, Color color, IconData icon) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        decoration: BoxDecoration(
-          color: color.withOpacity(0.05),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: color.withOpacity(0.1)),
-        ),
+  Widget _buildErrorState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
         child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, color: color, size: 20),
-            const SizedBox(height: 8),
-            Text(value, style: T.h2.copyWith(color: color, height: 1)),
-            const SizedBox(height: 4),
-            Text(label, style: T.captionSmall.copyWith(fontWeight: FontWeight.bold)),
+            const Icon(Icons.error_outline, size: 48, color: C.red),
+            const SizedBox(height: 16),
+            Text(_error!, textAlign: TextAlign.center, style: T.body),
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: _fetchBookings,
+              child: const Text('Coba Lagi'),
+            ),
           ],
         ),
       ),
     );
   }
 
+  Widget _buildBookingList(List<Booking> bookings, String emptyMessage) {
+    return RefreshIndicator(
+      onRefresh: _fetchBookings,
+      child: bookings.isEmpty
+          ? SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              child: SizedBox(
+                height: MediaQuery.of(context).size.height * 0.6,
+                child: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.assignment_outlined, size: 64, color: C.textGrey.withOpacity(0.3)),
+                      const SizedBox(height: 16),
+                      Text(emptyMessage, style: T.body.copyWith(color: C.textGrey)),
+                    ],
+                  ),
+                ),
+              ),
+            )
+          : ListView.separated(
+              padding: const EdgeInsets.all(20),
+              itemCount: bookings.length,
+              separatorBuilder: (context, index) => const SizedBox(height: 16),
+              itemBuilder: (context, index) => _buildModernBookingCard(bookings[index]),
+            ),
+    );
+  }
+
   Widget _buildModernBookingCard(Booking booking) {
     final bool isAssigned = booking.status != BookingStatus.draft;
-    // In real app, we fetch driver details. For now use dummy if assigned.
     final driver = isAssigned && booking.driverId != null
         ? dummyDrivers.firstWhere((d) => d.id == booking.driverId, orElse: () => dummyDrivers.first)
         : null;
@@ -269,7 +260,12 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen> {
                   ],
                 ),
                 const SizedBox(height: 16),
-                Text(booking.patientCondition, style: T.title.copyWith(fontSize: 18)),
+                Text(
+                  booking.patientCondition, 
+                  style: T.title.copyWith(fontSize: 18),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
                 const SizedBox(height: 12),
                 _buildLocationLine(Icons.radio_button_checked, Colors.green, booking.pickupAddress),
                 const SizedBox(height: 8),
@@ -280,66 +276,122 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen> {
           const Divider(height: 1, thickness: 1, color: Color(0xFFF1F3F5)),
           Padding(
             padding: const EdgeInsets.all(16),
-            child: isAssigned
-                ? Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF8F9FA),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Icon(Icons.person, color: C.textGrey),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(driver?.name ?? 'Driver Assigned', style: T.title.copyWith(fontSize: 14)),
-                            Text(driver?.ambulancePlate ?? '...', style: T.captionSmall),
-                          ],
-                        ),
-                      ),
-                      if (booking.status == BookingStatus.confirmed)
-                        ElevatedButton(
-                          onPressed: () => _updateStatus(booking.id, BookingStatus.en_route),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.orange,
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                          ),
-                          child: const Text('En Route'),
-                        )
-                      else if (booking.status == BookingStatus.en_route)
-                        ElevatedButton(
-                          onPressed: () => _updateStatus(booking.id, BookingStatus.arrived),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.blue,
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                          ),
-                          child: const Text('Arrived'),
-                        )
-                    ],
-                  )
-                : SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () => _navigateToAssignDriver(booking),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: C.red,
-                        foregroundColor: Colors.white,
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                      ),
-                      child: Text('Cari & Tugaskan Driver', style: T.btn),
-                    ),
-                  ),
+            child: _buildActionArea(booking, driver),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildActionArea(Booking booking, Driver? driver) {
+    if (booking.status == BookingStatus.draft) {
+      return Row(
+        children: [
+          Expanded(
+            child: ElevatedButton(
+              onPressed: () => _navigateToAssignDriver(booking),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: C.red,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                padding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+              child: Text('Tugaskan Driver', style: T.btn),
+            ),
+          ),
+          const SizedBox(width: 12),
+          IconButton(
+            onPressed: () => _updateStatus(booking.id, BookingStatus.cancelled),
+            icon: const Icon(Icons.cancel_outlined, color: Colors.grey),
+            tooltip: 'Batalkan',
+          ),
+        ],
+      );
+    }
+
+    if (booking.status == BookingStatus.completed || booking.status == BookingStatus.cancelled) {
+      return Row(
+        children: [
+          const Icon(Icons.history, size: 16, color: C.textGrey),
+          const SizedBox(width: 8),
+          Text(
+            booking.status == BookingStatus.completed ? 'Selesai' : 'Dibatalkan',
+            style: T.captionSmall.copyWith(color: C.textGrey),
+          ),
+        ],
+      );
+    }
+
+    // Active Mission Action
+    return Column(
+      children: [
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8F9FA),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.person, color: C.textGrey, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(driver?.name ?? 'Driver Assigned', style: T.title.copyWith(fontSize: 14)),
+                  Text(driver?.ambulancePlate ?? '...', style: T.captionSmall),
+                ],
+              ),
+            ),
+            _buildNextStatusButton(booking),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildNextStatusButton(Booking booking) {
+    String label;
+    BookingStatus nextStatus;
+    Color color;
+
+    switch (booking.status) {
+      case BookingStatus.confirmed:
+        label = 'Jalan';
+        nextStatus = BookingStatus.en_route;
+        color = Colors.orange;
+        break;
+      case BookingStatus.en_route:
+        label = 'Tiba';
+        nextStatus = BookingStatus.arrived;
+        color = Colors.blue;
+        break;
+      case BookingStatus.arrived:
+        label = 'Ke RS';
+        nextStatus = BookingStatus.to_hospital;
+        color = Colors.indigo;
+        break;
+      case BookingStatus.to_hospital:
+        label = 'Selesai';
+        nextStatus = BookingStatus.completed;
+        color = Colors.green;
+        break;
+      default:
+        return const SizedBox.shrink();
+    }
+
+    return ElevatedButton(
+      onPressed: () => _updateStatus(booking.id, nextStatus),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: color,
+        foregroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        elevation: 0,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+      ),
+      child: Text(label, style: T.btnSm.copyWith(color: Colors.white)),
     );
   }
 
@@ -362,9 +414,13 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen> {
 
   Widget _getAmbulanceIcon(String type) {
     Color color;
-    if (type.contains('medis')) color = Colors.orange;
-    else if (type.contains('sosial')) color = Colors.blue;
-    else color = Colors.green;
+    if (type.toLowerCase().contains('medis')) {
+      color = Colors.orange;
+    } else if (type.toLowerCase().contains('sosial')) {
+      color = Colors.blue;
+    } else {
+      color = Colors.green;
+    }
 
     return Container(
       padding: const EdgeInsets.all(4),
@@ -400,7 +456,6 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen> {
     );
 
     if (result != null && result is String) {
-      // Result is ambulanceId
       _assignDriver(booking.id, result);
     }
   }
