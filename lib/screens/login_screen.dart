@@ -65,35 +65,18 @@ class _LoginScreenState extends State<LoginScreen> {
             children: [
               const SizedBox(height: 48),
               // App Branding
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: C.redSoft,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Icon(Icons.emergency_rounded, color: C.red, size: 32),
-                  ),
-                  const SizedBox(width: 16),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'ResQLink',
-                        style: T.h2.copyWith(color: C.bg, height: 1.1),
-                      ),
-                      Text(
-                        'PARTNER PORTAL',
-                        style: T.captionSmall.copyWith(
-                          color: C.textGrey,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 1.5,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+              Image.asset(
+                'assets/images/ResQLink_Logo.png',
+                height: 56,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'PARTNER PORTAL',
+                style: T.captionSmall.copyWith(
+                  color: C.textGrey,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 1.5,
+                ),
               ),
               const SizedBox(height: 56),
               
